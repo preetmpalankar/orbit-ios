@@ -6,6 +6,7 @@ import Testing
 final class FakeTransport: OrbitTransport, @unchecked Sendable {
     private let lock = NSLock()
     private var _down = false, _postCode = 201, _version = 1
+    var afterLogin = false
     private(set) var posts: [(URL, [String: Any])] = []
     private(set) var onMainThread = false
     private(set) var calls = 0
@@ -23,7 +24,7 @@ final class FakeTransport: OrbitTransport, @unchecked Sendable {
     }
     func get(url: URL) async throws -> (Int, Data) {
         try touch()
-        return (200, Data(configJSON(version).utf8))
+        return (200, Data(configJSON(version, afterLogin: afterLogin).utf8))
     }
     func send(method: String, url: URL, body: Data?) async throws -> Int {
         try touch()
@@ -32,8 +33,8 @@ final class FakeTransport: OrbitTransport, @unchecked Sendable {
     }
 }
 
-func configJSON(_ v: Int) -> String { """
-{"app":{"name":"Shop"},"org":{"name":"Acme Retail","contactEmail":null,"privacyCentreUrl":"https://orbit.example/p/acme"},
+func configJSON(_ v: Int, afterLogin: Bool = false) -> String { """
+{"app":{"name":"Shop"},"banner":{"afterLogin":\(afterLogin)},"org":{"name":"Acme Retail","contactEmail":null,"privacyCentreUrl":"https://orbit.example/p/acme"},
  "notice":{"documentId":"d1","version":\(v),"url":"https://orbit.example/n/acme/d1","summary":{"en":"We use your data.","hi":"हम डेटा का उपयोग करते हैं।"}},
  "languages":["en","hi"],"ui":{"en":{"acceptAll":"Accept all"},"hi":{"acceptAll":"सभी स्वीकार करें"}},
  "purposes":[{"code":"service","title":"Service","description":"Run the app","essential":true,"translations":{}},
@@ -74,6 +75,28 @@ func configJSON(_ v: Int) -> String { """
     @Test func inertBeforeStart() {
         #expect(!(Orbit.consent.isGranted("analytics")))
         #expect(!(Orbit.consent.acceptAll()))
+    }
+
+    @Test func afterLoginControlsBannerVisibilityAcrossAccounts() async {
+        let t = FakeTransport()
+        t.afterLogin = true
+        let c = make(MemoryStore(), t)
+        await c.load()
+        #expect(!c.snapshot().canShowBanner)
+        #expect(!c.needsConsent)
+        #expect(c.state("analytics") == .unknown)
+
+        #expect(c.identify("account_1234"))
+        #expect(c.snapshot().canShowBanner)
+        #expect(c.needsConsent)
+        c.rejectAll()
+
+        c.resetIdentity()
+        #expect(!c.snapshot().canShowBanner)
+        #expect(c.identify("account_1234"))
+        #expect(!c.needsConsent)
+        #expect(c.identify("account_5678"))
+        #expect(c.needsConsent)
     }
 
     @Test func acceptRejectWithdraw() async throws {

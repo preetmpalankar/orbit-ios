@@ -6,10 +6,10 @@ consents. Swift Package, iOS 13+ (SwiftUI banner iOS 15+), no third-party depend
 
 ## Install
 
-Xcode → File → Add Package Dependencies → `https://github.com/preetmpalankar/orbit-ios` (version 1.0.0), or:
+Xcode → File → Add Package Dependencies → `https://github.com/preetmpalankar/orbit-ios` (version 1.0.1), or:
 
 ```swift
-.package(url: "https://github.com/preetmpalankar/orbit-ios", from: "1.0.0")
+.package(url: "https://github.com/preetmpalankar/orbit-ios", from: "1.0.1")
 // target: .product(name: "OrbitSDK", package: "orbit-ios")
 ```
 
@@ -39,6 +39,8 @@ let sub = Orbit.consent.onChange { snapshot in … }   // called now and after e
 Orbit.consent.publisher.sink { snapshot in … }        // Combine
 for await snapshot in Orbit.consent.changes() { … }    // async stream
 ```
+
+When **Consent → Banner → After login** is enabled, call `Orbit.identify` after authentication or session restoration, and `Orbit.resetIdentity()` on sign-out. Mounted SwiftUI banners react to identity changes. For the one-shot presenter, call `OrbitConsentViewController.presentIfNeeded(from:)` from the signed-in screen after identifying the user.
 
 Purpose codes are the ones in your Orbit dashboard. `record` returns false until the notice config has loaded. Before
 `Orbit.start` is called, `Orbit.consent` is an inert instance: every non-essential purpose is not granted and nothing is
@@ -126,7 +128,7 @@ module name differs from the list may be missed.
 
 Sent to Orbit (TLS only, `https://apidpdp-orbit.juricloud.co/api/v1` unless you pass `apiURL`) over an ephemeral
 `URLSession` (no cookies, no cache): the principal id, the language, the notice version and the choices. Headers:
-`X-Orbit-App` (bundle id) and `User-Agent: orbit-ios/1.0.0`. The key is never logged.
+`X-Orbit-App` (bundle id) and `User-Agent: orbit-ios/1.0.1`. The key is never logged.
 
 Stored in `Application Support/Orbit/orbit.json` (written atomically, file protection "until first unlock"): the
 principal id, `{v, at, choices}`, records not yet confirmed by the server, the last notice config, the chosen language

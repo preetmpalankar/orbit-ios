@@ -63,7 +63,7 @@ public final class OrbitConsent: @unchecked Sendable {
             store.set(scope + K.pid, principalId)
         }
         #if canImport(Combine)
-        subject = CurrentValueSubject(ConsentSnapshot(statuses: [:], needsConsent: false, ready: false))
+        subject = CurrentValueSubject(ConsentSnapshot(statuses: [:], needsConsent: false, ready: false, canShowBanner: false))
         subject.value = snapshot()
         #endif
     }
@@ -98,7 +98,11 @@ public final class OrbitConsent: @unchecked Sendable {
     /// True only for granted or essential purposes. Unknown, denied, withdrawn and "Orbit unreachable" are false.
     public func isGranted(_ purpose: String) -> Bool { [.granted, .essential].contains(state(purpose)) }
 
-    public var needsConsent: Bool { config != nil && current() == nil }
+    public var canShowBanner: Bool {
+        guard let config else { return false }
+        return config.banner?.afterLogin != true || !principalId.hasPrefix("anon_")
+    }
+    public var needsConsent: Bool { canShowBanner && current() == nil }
 
     /// Language of the notice: the one the person picked, else the device language if offered, else the first.
     public var language: String {
@@ -115,7 +119,7 @@ public final class OrbitConsent: @unchecked Sendable {
         let cur = current() ?? [:]
         var all: [String: ConsentStatus] = [:]
         for p in Set(cur.keys).union((config?.purposes ?? []).map(\.code)) { all[p] = effective(p, choices: cur) }
-        return ConsentSnapshot(statuses: all, needsConsent: needsConsent, ready: loaded)
+        return ConsentSnapshot(statuses: all, needsConsent: needsConsent, ready: loaded, canShowBanner: canShowBanner)
     }
 
     /// Called now with the current state and after every change, on the thread that made the change.

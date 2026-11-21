@@ -8,7 +8,7 @@ import Foundation
 /// ```
 /// Orbit never reads the IDFA and does not link AdSupport or AppTrackingTransparency.
 public enum Orbit {
-    public static let version = "1.0.0"
+    public static let version = "1.0.1"
     public static let defaultAPI = "https://apidpdp-orbit.juricloud.co/api/v1"
 
     private static let lock = NSLock()

@@ -9,6 +9,9 @@ public final class OrbitConsentViewController: UIViewController {
     private var choose = false
     private var draft: [String: Bool] = [:]
     private var firstTime = true
+    private var visibilitySubscription: OrbitSubscription?
+
+    deinit { visibilitySubscription?.cancel() }
     private var handlers: [Handler] = [] // target-action keeps iOS 13 support (UIAction is iOS 14+)
 
     private final class Handler: NSObject {
@@ -31,7 +34,7 @@ public final class OrbitConsentViewController: UIViewController {
             sub?.cancel()
             guard s.needsConsent else { return }
             DispatchQueue.main.async {
-                guard let p = presenter, p.presentedViewController == nil else { return }
+                guard Orbit.consent.needsConsent, let p = presenter, p.presentedViewController == nil else { return }
                 p.present(OrbitConsentViewController(), animated: true)
             }
         }
@@ -63,7 +66,20 @@ public final class OrbitConsentViewController: UIViewController {
             stack.trailingAnchor.constraint(equalTo: g.trailingAnchor, constant: -20),
             stack.widthAnchor.constraint(equalTo: scroll.frameLayoutGuide.widthAnchor, constant: -40),
         ])
-        render()
+        if consent.canShowBanner { render() }
+        visibilitySubscription = consent.onChange { [weak self] snapshot in
+            guard !snapshot.canShowBanner else { return }
+            DispatchQueue.main.async {
+                guard let self, !self.consent.canShowBanner else { return }
+                self.stack.isHidden = true
+                self.dismiss(animated: true)
+            }
+        }
+    }
+
+    public override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        if !consent.canShowBanner { dismiss(animated: animated) }
     }
 
     private func render() {

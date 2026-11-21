@@ -11,6 +11,7 @@ public struct ConsentSnapshot: Equatable, Sendable {
     public let needsConsent: Bool
     /// True once the notice config is loaded (from the server or the last cached copy), or loading has failed.
     public let ready: Bool
+    public let canShowBanner: Bool
 
     public func status(_ purpose: String) -> ConsentStatus { statuses[purpose] ?? .unknown }
     public func isGranted(_ purpose: String) -> Bool { [.granted, .essential].contains(status(purpose)) }
@@ -37,6 +38,8 @@ public struct NoticeConfig: Codable, Sendable {
     public let notice: Notice
     public let languages: [String]
     public let ui: [String: [String: String]]?
+    public struct Banner: Codable, Sendable { public let afterLogin: Bool? }
+    public let banner: Banner?
     public let purposes: [Purpose]
 
     public var optional: [Purpose] { purposes.filter { !$0.essential } }

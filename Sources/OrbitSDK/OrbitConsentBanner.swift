@@ -31,7 +31,7 @@ public struct OrbitConsentBanner: View {
 
     public var body: some View {
         let consent = Orbit.consent
-        if let cfg = consent.config, model.snapshot.needsConsent || forceOpen {
+        if let cfg = consent.config, model.snapshot.canShowBanner, model.snapshot.needsConsent || forceOpen {
             let first = model.snapshot.needsConsent
             let l = { (k: String) in cfg.label(lang, k) }
             ScrollView {
@@ -73,6 +73,8 @@ public struct OrbitConsentBanner: View {
                 .padding()
             }
             .environment(\.layoutDirection, lang == "ur" ? .rightToLeft : .leftToRight)
+            .onChange(of: consent.principalId) { _ in choose = false; draft = [:] }
+            .onDisappear { choose = false; draft = [:] }
         }
     }
 
