@@ -7,6 +7,9 @@ final class FakeTransport: OrbitTransport, @unchecked Sendable {
     private let lock = NSLock()
     private var _down = false, _postCode = 201, _version = 1
     var afterLogin = false
+    /// Body for `POST /c/v1/state` (the signed-in account's decisions); nil answers 403.
+    var account: String?
+    private(set) var stateCalls: [[String: Any]] = []
     private(set) var posts: [(URL, [String: Any])] = []
     private(set) var onMainThread = false
     private(set) var calls = 0
@@ -25,6 +28,14 @@ final class FakeTransport: OrbitTransport, @unchecked Sendable {
     func get(url: URL) async throws -> (Int, Data) {
         try touch()
         return (200, Data(configJSON(version, afterLogin: afterLogin).utf8))
+    }
+    func exchange(method: String, url: URL, body: Data?) async throws -> (Int, Data) {
+        try touch()
+        let obj = (try? JSONSerialization.jsonObject(with: body ?? Data())) as? [String: Any] ?? [:]
+        return sync {
+            stateCalls.append(obj)
+            return account.map { (200, Data($0.utf8)) } ?? (403, Data())
+        }
     }
     func send(method: String, url: URL, body: Data?) async throws -> Int {
         try touch()
@@ -96,6 +107,48 @@ func configJSON(_ v: Int, afterLogin: Bool = false) -> String { """
         #expect(c.identify("account_1234"))
         #expect(!c.needsConsent)
         #expect(c.identify("account_5678"))
+        #expect(c.needsConsent)
+    }
+
+    private let proof = "v1." + String(repeating: "a", count: 64)
+
+    @Test func signedInAccountThatDecidedElsewhereIsNotAskedAgain() async throws {
+        let t = FakeTransport()
+        t.account = #"{"purposes":[{"purpose":"analytics","state":"granted"},{"purpose":"marketing","state":"denied"}]}"#
+        let c = make(MemoryStore(), t)
+        await c.load()
+        #expect(c.needsConsent)
+        #expect(c.identify("account_1234", subjectProof: proof))
+        try await wait { !c.needsConsent }
+        #expect(c.isGranted("analytics"))
+        #expect(c.state("marketing") == .denied)
+        #expect((t.stateCalls.first?["principalRef"] as? String) == "account_1234")
+        #expect(t.postCount == 0)
+    }
+
+    @Test func withdrawalOnAnotherDeviceStopsProcessingHere() async throws {
+        let t = FakeTransport()
+        let c = make(MemoryStore(), t)
+        await c.load()
+        #expect(c.identify("account_1234", subjectProof: proof))
+        c.acceptAll()
+        try await wait { t.postCount == 1 }
+        t.account = #"{"purposes":[{"purpose":"analytics","state":"withdrawn"},{"purpose":"marketing","state":"granted"}]}"#
+        await c.syncAccount(force: true)
+        #expect(c.state("analytics") == .withdrawn)
+        #expect(c.isGranted("marketing"))
+    }
+
+    @Test func reviewGrantsAreAskedAgainAndAnonymousNeverReadsState() async throws {
+        let t = FakeTransport()
+        t.account = #"{"purposes":[{"purpose":"analytics","state":"review"},{"purpose":"marketing","state":"denied"}]}"#
+        let c = make(MemoryStore(), t)
+        await c.load()
+        c.acceptAll()
+        await c.syncAccount(force: true)
+        #expect(t.stateCalls.isEmpty)
+        #expect(c.identify("account_1234", subjectProof: proof))
+        await c.syncAccount(force: true)
         #expect(c.needsConsent)
     }
 

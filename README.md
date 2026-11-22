@@ -6,10 +6,10 @@ consents. Swift Package, iOS 13+ (SwiftUI banner iOS 15+), no third-party depend
 
 ## Install
 
-Xcode → File → Add Package Dependencies → `https://github.com/preetmpalankar/orbit-ios` (version 1.0.1), or:
+Xcode → File → Add Package Dependencies → `https://github.com/preetmpalankar/orbit-ios` (version 1.0.2), or:
 
 ```swift
-.package(url: "https://github.com/preetmpalankar/orbit-ios", from: "1.0.1")
+.package(url: "https://github.com/preetmpalankar/orbit-ios", from: "1.0.2")
 // target: .product(name: "OrbitSDK", package: "orbit-ios")
 ```
 
@@ -128,7 +128,7 @@ module name differs from the list may be missed.
 
 Sent to Orbit (TLS only, `https://apidpdp-orbit.juricloud.co/api/v1` unless you pass `apiURL`) over an ephemeral
 `URLSession` (no cookies, no cache): the principal id, the language, the notice version and the choices. Headers:
-`X-Orbit-App` (bundle id) and `User-Agent: orbit-ios/1.0.1`. The key is never logged.
+`X-Orbit-App` (bundle id) and `User-Agent: orbit-ios/1.0.2`. The key is never logged.
 
 Stored in `Application Support/Orbit/orbit.json` (written atomically, file protection "until first unlock"): the
 principal id, `{v, at, choices}`, records not yet confirmed by the server, the last notice config, the chosen language

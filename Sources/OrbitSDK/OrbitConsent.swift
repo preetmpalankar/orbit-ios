@@ -205,7 +205,50 @@ public final class OrbitConsent: @unchecked Sendable {
         stored = store.get(stateKey).flatMap { try? Self.decoder.decode(StoredChoice.self, from: Data($0.utf8)) }
         lock.unlock()
         emit()
+        Task.detached(priority: .utility) { [weak self] in await self?.syncAccount(force: true) }
         return true
+    }
+
+    private var syncedAt: TimeInterval = 0
+
+    /// A signed-in person's decisions live with their account, not this device: a decision or withdrawal made on another
+    /// device applies here (DPDP s.6(6): processing stops on withdrawal), and an account that already decided is not
+    /// asked again. Unsent decisions on this device are newer and win. Anonymous choices stay on their device.
+    func syncAccount(force: Bool = false) async {
+        let request: (who: String, body: Data)? = sync {
+            guard config != nil, !principalId.hasPrefix("anon_"), let proof = subjectProof,
+                  force || ProcessInfo.processInfo.systemUptime - syncedAt > 60,
+                  !queue().contains(where: { $0.body.principalRef == principalId }),
+                  let body = try? JSONEncoder().encode(["principalRef": principalId, "subjectProof": proof]) else { return nil }
+            syncedAt = ProcessInfo.processInfo.systemUptime
+            return (principalId, body)
+        }
+        guard let request, let u = url("state"),
+              let (code, data) = try? await transport.exchange(method: "POST", url: u, body: request.body), (200..<300).contains(code),
+              let account = try? JSONDecoder().decode(AccountState.self, from: data) else { return }
+        let changed = sync { () -> Bool in
+            guard request.who == principalId, let c = config, !queue().contains(where: { $0.body.principalRef == request.who }) else { return false }
+            var decided: [String: ConsentStatus] = [:]
+            for p in account.purposes {
+                if let s = ConsentStatus(rawValue: p.state), [.granted, .denied, .withdrawn].contains(s) { decided[p.purpose] = s }
+            }
+            let codes = c.optional.map(\.code)
+            let local = stored
+            var next: StoredChoice?
+            if !codes.isEmpty, codes.allSatisfy({ decided[$0] != nil }) {
+                // Every purpose answered under the current notice ("review" grants are not answers).
+                next = StoredChoice(v: c.notice.version, at: Date(), choices: Dictionary(uniqueKeysWithValues: codes.map { ($0, decided[$0]!) }))
+            } else if let local {
+                var choices = local.choices
+                for code in codes where choices[code] == .granted { if let d = decided[code], d != .granted { choices[code] = d } }
+                if choices != local.choices { next = StoredChoice(v: local.v, at: local.at, choices: choices) }
+            }
+            guard let next, !(local?.v == next.v && local?.choices == next.choices) else { return false }
+            stored = next
+            store.set(stateKey, (try? Self.encoder.encode(next)).map { String(decoding: $0, as: UTF8.self) })
+            return true
+        }
+        if changed { emit() }
     }
 
     public func resetIdentity() {
@@ -272,6 +315,7 @@ public final class OrbitConsent: @unchecked Sendable {
         }
         emit()
         kick()
+        await syncAccount()
     }
 
     private func queue() -> [QueueItem] {

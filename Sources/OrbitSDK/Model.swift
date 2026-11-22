@@ -61,7 +61,15 @@ public struct NoticeConfig: Codable, Sendable {
     static let languageNames = [
         "en": "English", "hi": "हिन्दी", "kn": "ಕನ್ನಡ", "ta": "தமிழ்", "te": "తెలుగు", "mr": "मराठी", "bn": "বাংলা",
         "gu": "ગુજરાતી", "ml": "മലയാളം", "pa": "ਪੰਜਾਬੀ", "or": "ଓଡ଼ିଆ", "as": "অসমীয়া", "ur": "اردو",
+        "brx": "बड़ो", "doi": "डोगरी", "ks": "کٲشُر", "kok": "कोंकणी", "mai": "मैथिली", "mni": "মৈতৈলোন্",
+        "ne": "नेपाली", "sa": "संस्कृतम्", "sat": "ᱥᱟᱱᱛᱟᱲᱤ", "sd": "سنڌي",
     ]
+}
+
+/// `POST /c/v1/state`: a signed-in person's current decision per optional purpose.
+struct AccountState: Decodable {
+    struct Purpose: Decodable { let purpose: String; let state: String }
+    let purposes: [Purpose]
 }
 
 struct StoredChoice: Codable {

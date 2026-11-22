@@ -8,7 +8,7 @@ import Foundation
 /// ```
 /// Orbit never reads the IDFA and does not link AdSupport or AppTrackingTransparency.
 public enum Orbit {
-    public static let version = "1.0.1"
+    public static let version = "1.0.2"
     public static let defaultAPI = "https://apidpdp-orbit.juricloud.co/api/v1"
 
     private static let lock = NSLock()
@@ -29,7 +29,7 @@ public enum Orbit {
         if shared != nil { lock.unlock(); return }
         let appId = Bundle.main.bundleIdentifier ?? "unknown"
         let c = OrbitConsent(store: FileStore(), transport: URLSessionTransport(appId: appId), apiURL: apiURL, key: publicKey,
-                             deviceLanguage: String((Locale.preferredLanguages.first ?? "en").prefix(2)).lowercased())
+                             deviceLanguage: String((Locale.preferredLanguages.first ?? "en").split(separator: "-").first ?? "en").lowercased())
         shared = c
         lock.unlock()
         Task.detached(priority: .utility) {

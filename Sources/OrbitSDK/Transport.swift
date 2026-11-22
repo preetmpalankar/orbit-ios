@@ -10,6 +10,13 @@ public protocol OrbitStore: AnyObject {
 public protocol OrbitTransport: Sendable {
     func send(method: String, url: URL, body: Data?) async throws -> Int
     func get(url: URL) async throws -> (Int, Data)
+    /// A request whose response body is needed (the signed-in account's decisions).
+    func exchange(method: String, url: URL, body: Data?) async throws -> (Int, Data)
+}
+
+public extension OrbitTransport {
+    /// Custom transports written before `exchange` existed keep working: without a body the account sync is skipped.
+    func exchange(method: String, url: URL, body: Data?) async throws -> (Int, Data) { (try await send(method: method, url: url, body: body), Data()) }
 }
 
 /// `Application Support/Orbit/orbit.json`, written atomically: the opaque id, choices, cached config and unsent queue.
@@ -81,6 +88,14 @@ final class URLSessionTransport: OrbitTransport {
         r.httpBody = body
         r.setValue("application/json", forHTTPHeaderField: "Content-Type")
         return try await run(r).0
+    }
+
+    func exchange(method: String, url: URL, body: Data?) async throws -> (Int, Data) {
+        var r = URLRequest(url: url)
+        r.httpMethod = method
+        r.httpBody = body
+        r.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        return try await run(r)
     }
 
     func get(url: URL) async throws -> (Int, Data) { try await run(URLRequest(url: url)) }
